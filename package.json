@@ -1,0 +1,16 @@
+{
+  "name": "8-player-ludo",
+  "version": "1.0.0",
+  "description": "Online 8 Player Ludo Game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "socket.io": "^4.8.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

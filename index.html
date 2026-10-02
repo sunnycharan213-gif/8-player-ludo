@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
+
+<title>8 Player Ludo</title>
+
+<script src="/socket.io/socket.io.js"></script>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #111827;
+    color: white;
+    text-align: center;
+}
+
+h1 {
+    margin: 18px 0 8px;
+}
+
+button {
+    border: none;
+    border-radius: 12px;
+    padding: 13px 20px;
+    margin: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+input {
+    width: 220px;
+    padding: 13px;
+    border-radius: 10px;
+    border: none;
+    font-size: 16px;
+    text-align: center;
+    margin: 6px;
+}
+
+#roomScreen {
+    padding: 20px;
+}
+
+#gameScreen {
+    display: none;
+    padding: 10px;
+}
+
+.room-box {
+    max-width: 420px;
+    margin: 20px auto;
+    padding: 20px;
+    background: #1f2937;
+    border-radius: 18px;
+}
+
+.room-code {
+    font-size: 30px;
+    font-weight: bold;
+    letter-spacing: 5px;
+    margin: 15px;
+}
+
+.status {
+    margin: 10px auto;
+    max-width: 600px;
+    padding: 12px;
+    border-radius: 12px;
+    background: #1f2937;
+}
+
+.players {
+    font-size: 18px;
+    margin: 8px;
+}
+
+#board {
+    width: min(94vw, 650px);
+    height: min(94vw, 650px);
+    max-width: 650px;
+    max-height: 650px;
+    margin: 15px auto;
+    display: grid;
+    grid-template-columns: repeat(15, 1fr);
+    grid-template-rows: repeat(15, 1fr);
+    background: white;
+    border: 5px solid #111;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.cell {
+    position: relative;
+    border: 1px solid #aaa;
+    background: #f8fafc;
+}
+
+.home {
+    background: #e5e7eb;
+}
+
+.center {
+    background: #facc15;
+}
+
+.path {
+    background: white;
+}
+
+.pawn {
+    width: 65%;
+    height: 65%;
+    position: absolute;
+    border-radius: 50%;
+    border: 2px solid #111;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 10px;
+    font-weight: bold;
+    color: white;
+    cursor: pointer;
+    z-index: 5;
+}
+
+.p1 { background: #ef4444; }
+.p2 { background: #3b82f6; }
+.p3 { background: #22c55e; }
+.p4 { background: #f59e0b; }
+.p5 { background: #a855f7; }
+.p6 { background: #ec4899; }
+.p7 { background: #06b6d4; }
+.p8 { background: #84cc16; }
+
+.dice-box {
+    margin: 12px;
+}
+
+#dice {
+    font-size: 55px;
+    margin: 5px;
+}
+
+#rollButton {
+    background: #22c55e;
+    color: white;
+}
+
+#message {
+    min-height: 25px;
+    font-weight: bold;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.player-list {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px;
+}
+
+.player-badge {
+    padding: 7px 10px;
+    border-radius: 10px;
+    background: #374151;
+}
+
+.current {
+    outline: 3px solid white;
+}
+
+@media (max-width: 500px) {
+
+    h1 {
+        font-size: 25px;
+    }
+
+    button {
+        padding: 11px 15px;
+        font-size: 14px;
+    }
+
+    .room-code {
+        font-size: 25px;
+    }
+
+    #board {
+        border-width: 3px;
+    }
+
+    .pawn {
+        font-size: 8px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<h1>🎲 8 Player Ludo</h1>
+
+<!-- ================= ROOM SCREEN ================= -->
+
+<div id="roomScreen">
+
+    <div class="room-box">
+
+        <h2>Create Game</h2>
+
+        <button onclick="createRoom()">
+            🏠 Create Room
+        </button>
+
+        <hr>
+
+        <h2>Join Game</h2>
+
+        <input
+            id="roomInput"
+            placeholder="Enter Room Code"
+            maxlength="5"
+            autocomplete="off"
+        >
+
+        <br>
+
+        <button onclick="joinRoom()">
+            🚀 Join Room
+        </button>
+
+        <div id="roomMessage"></div>
+
+    </div>
+
+</div>
+
+<!-- ================= GAME SCREEN ================= -->
+
+<div id="gameScreen">
+
+    <div class="status">
+
+        <div>
+            Room:
+            <strong id="gameRoomCode">---</strong>
+        </div>
+
+        <div class="players">
+            Players:
+            <strong id="playerCount">0</strong>/8
+        </div>
+
+        <div>
+            You are:
+            <strong id="myPlayer">Player --</strong>
+        </div>
+
+    </div>
+
+    <div class="player-list" id="playerList"></div>
+
+    <div class="status">
+        <strong id="turnText">
+            Waiting...
+        </strong>
+    </div>
+
+    <div id="board"></div>
+
+    <div class="dice-box">
+
+        <div id="dice">🎲</div>
+
+        <button
+            id="rollButton"
+            onclick="rollDice()">
+            🎲 Roll Dice
+        </button>
+
+    </div>
+
+    <div id="message"></div>
+
+</div>
+
+<script>
+
+const socket = io();
+
+let myPlayerNumber = null;
+let roomCode = null;
+
+let currentPlayer = 1;
+let diceValue = null;
+
+let gamePawns = {};
+
+let winners = [];
+
+const roomScreen =
+    document.getElementById("roomScreen");
+
+const gameScreen =
+    document.getElementById("gameScreen");
+
+const roomInput =
+    document.getElementById("roomInput");
+
+const roomMessage =
+    document.getElementById("roomMessage");
+
+const gameRoomCode =
+    document.getElementById("gameRoomCode");
+
+const playerCount =
+    document.getElementById("playerCount");
+
+const myPlayer =
+    document.getElementById("myPlayer");
+
+const turnText =
+    document.getElementById("turnText");
+
+const dice =
+    document.getElementById("dice");
+
+const rollButton =
+    document.getElementById("rollButton");
+
+const message =
+    document.getElementById("message");
+
+const board =
+    document.getElementById("board");
+
+
+// ==================================================
+// ROOM
+// ==================================================
+
+function createRoom() {
+
+    roomMessage.innerText =
+        "Creating room...";
+
+    socket.emit("createRoom");
+}
+
+
+function joinRoom() {
+
+    const code =
+        roomInput.value
+            .trim()
+            .toUpperCase();
+
+    if (!code) {
+
+        roomMessage.innerText =
+            "Enter room code.";
+
+        return;
+    }
+
+    roomMessage.innerText =
+        "Joining room...";
+
+    socket.emit(
+        "joinRoom",
+        {
+            roomCode: code
+        }
+    );
+}
+
+
+// ==================================================
+// ROOM CREATED
+// ==================================================
+
+socket.on(
+    "roomCreated",
+    data => {
+
+        roomCode =
+            data.roomCode;
+
+        gameRoomCode.innerText =
+            roomCode;
+
+        roomMessage.innerHTML =
+            "Room created: <b>" +
+            roomCode +
+            "</b><br>Share this code.";
+
+        showGame();
+    }
+);
+
+
+// ==================================================
+// ROOM JOINED
+// ==================================================
+
+socket.on(
+    "roomJoined",
+    data => {
+
+        roomCode =
+            data.roomCode;
+
+        gameRoomCode.innerText =
+            roomCode;
+
+        showGame();
+
+        setMessage(
+            "Joined room successfully!"
+        );
+    }
+);
+
+
+// ==================================================
+// PLAYER JOINED
+// ==================================================
+
+socket.on(
+    "playerJoined",
+    data => {
+
+        myPlayerNumber =
+            data.playerNumber;
+
+        myPlayer.innerText =
+            "Player " +
+            myPlayerNumber;
+
+        setMessage(
+            "You joined as Player " +
+            myPlayerNumber
+        );
+    }
+);
+
+
+// ==================================================
+// PLAYER COUNT
+// ==================================================
+
+socket.on(
+    "playersUpdate",
+    data => {
+
+        playerCount.innerText =
+            data.count;
+
+        updatePlayerList(
+            data.count
+        );
+    }
+);
+
+
+// ==================================================
+// GAME STATE
+// ==================================================
+
+socket.on(
+    "gameState",
+    data => {
+
+        currentPlayer =
+            data.currentPlayer;
+
+        diceValue =
+            data.dice;
+
+        gamePawns =
+            data.pawns || {};
+
+        winners =
+            data.winners || [];
+
+        if (
+            roomCode &&
+            gameScreen.style.display !== "block"
+        ) {
+            showGame();
+        }
+
+        renderBoard();
+        updateTurn();
+        updateDice();
+    }
+);
+
+
+// ==================================================
+// TURN
+// ==================================================
+
+socket.on(
+    "turnChanged",
+    data => {
+
+        currentPlayer =
+            data.currentPlayer;
+
+        diceValue = null;
+
+        updateTurn();
+        updateDice();
+    }
+);
+
+
+// ==================================================
+// DICE
+// ==================================================
+
+socket.on(
+    "diceRolled",
+    data => {
+
+        diceValue =
+            data.dice;
+
+        updateDice();
+
+        if (
+            data.player ===
+            myPlayerNumber
+        ) {
+            setMessage(
+                "Your dice: " +
+                data.dice +
+                " 🎲"
+            );
+        } else {
+            setMessage(
+                "Player " +
+                data.player +
+                " rolled " +
+                data.dice
+            );
+        }
+    }
+);
+
+
+// ==================================================
+// PAWN MOVED
+// ==================================================
+
+socket.on(
+    "pawnMoved",
+    data => {
+
+        gamePawns[data.player]
+            [data.pawnIndex] =
+            data.position;
+
+        diceValue = null;
+
+        renderBoard();
+        updateDice();
+
+        if (
+            data.player ===
+            myPlayerNumber
+        ) {
+            setMessage(
+                "Pawn moved!"
+            );
+        }
+    }
+);
+
+
+// ==================================================
+// CAPTURE
+// ==================================================
+
+socket.on(
+    "captureMessage",
+    data => {
+
+        setMessage(
+            "💥 Player " +
+            data.player +
+            " captured a pawn!"
+        );
+
+        renderBoard();
+    }
+);
+
+
+// ==================================================
+// PAWN FINISHED
+// ==================================================
+
+socket.on(
+    "pawnFinished",
+    data => {
+
+        setMessage(
+            "🏁 Player " +
+            data.player +
+            " finished a pawn!"
+        );
+    }
+);
+
+
+// ==================================================
+// WINNER
+// ==================================================
+
+socket.on(
+    "playerWon",
+    data => {
+
+        winners =
+            data.winners || [];
+
+        setMessage(
+            "🏆 Player " +
+            data.player +
+            " completed all pawns!"
+        );
+
+        updateTurn();
+    }
+);
+
+
+// ==================================================
+// ERROR
+// ==================================================
+
+socket.on(
+    "roomError",
+    data => {
+
+        roomMessage.innerText =
+            "❌ " +
+            data.message;
+    }
+);
+
+
+// ==================================================
+// MOVE ERROR
+// ==================================================
+
+socket.on(
+    "moveRejected",
+    data => {
+
+        setMessage(
+            "⚠️ " +
+            data.message
+        );
+    }
+);
+
+
+// ==================================================
+// ROLL
+// ==================================================
+
+function rollDice() {
+
+    if (
+        myPlayerNumber !==
+        currentPlayer
+    ) {
+
+        setMessage(
+            "Wait for your turn."
+        );
+
+        return;
+    }
+
+    if (
+        diceValue !== null
+    ) {
+
+        setMessage(
+            "Move your pawn first."
+        );
+
+        return;
+    }
+
+    socket.emit(
+        "rollDice"
+    );
+}
+
+
+// ==================================================
+// MOVE PAWN
+// ==================================================
+
+function movePawn(
+    pawnIndex
+) {
+
+    if (
+        myPlayerNumber !==
+        currentPlayer
+    ) {
+
+        setMessage(
+            "Wait for your turn."
+        );
+
+        return;
+    }
+
+    if (
+        diceValue === null
+    ) {
+
+        setMessage(
+            "Roll the dice first."
+        );
+
+        return;
+    }
+
+    socket.emit(
+        "movePawn",
+        {
+            pawnIndex
+        }
+    );
+}
+
+
+// ==================================================
+// SHOW GAME
+// ==================================================
+
+function showGame() {
+
+    roomScreen.style.display =
+        "none";
+
+    gameScreen.style.display =
+        "block";
+
+    gameRoomCode.innerText =
+        roomCode;
+
+    renderBoard();
+}
+
+
+// ==================================================
+// MESSAGE
+// ==================================================
+
+function setMessage(text) {
+
+    message.innerText =
+        text;
+}
+
+
+// ==================================================
+// TURN UI
+// ==================================================
+
+function updateTurn() {
+
+    if (!currentPlayer) {
+        return;
+    }
+
+    if (
+        currentPlayer ===
+        myPlayerNumber
+    ) {
+
+        turnText.innerText =
+            "🟢 YOUR TURN";
+
+        rollButton.disabled =
+            diceValue !== null;
+
+    } else {
+
+        turnText.innerText =
+            "Player " +
+            currentPlayer +
+            "'s TURN";
+
+        rollButton.disabled =
+            true;
+    }
+
+    updatePlayerList(
+        Number(
+            playerCount.innerText
+        )
+    );
+}
+
+
+// ==================================================
+// DICE UI
+// ==================================================
+
+function updateDice() {
+
+    const faces = [
+        "⚀",
+        "⚁",
+        "⚂",
+        "⚃",
+        "⚄",
+        "⚅"
+    ];
+
+    if (
+        diceValue >= 1 &&
+        diceValue <= 6
+    ) {
+
+        dice.innerText =
+            faces[diceValue - 1];
+
+    } else {
+
+        dice.innerText =
+            "🎲";
+    }
+
+    if (
+        myPlayerNumber ===
+        currentPlayer &&
+        diceValue === null
+    ) {
+
+        rollButton.disabled =
+            false;
+
+    } else {
+
+        rollButton.disabled =
+            true;
+    }
+}
+
+
+// ==================================================
+// PLAYER LIST
+// ==================================================
+
+function updatePlayerList(
+    count
+) {
+
+    const list =
+        document.getElementById(
+            "playerList"
+        );
+
+    list.innerHTML = "";
+
+    if (!count) return;
+
+    for (
+        let i = 1;
+        i <= count;
+        i++
+    ) {
+
+        const badge =
+            document.createElement(
+                "div"
+            );
+
+        badge.className =
+            "player-badge";
+
+        if (
+            i === currentPlayer
+        ) {
+            badge.classList.add(
+                "current"
+            );
+        }
+
+        badge.innerText =
+            "P" + i;
+
+        list.appendChild(
+            badge
+        );
+    }
+}
+
+
+// ==================================================
+// BOARD
+// ==================================================
+
+function createBoard() {
+
+    board.innerHTML = "";
+
+    for (
+        let row = 0;
+        row < 15;
+        row++
+    ) {
+
+        for (
+            let col = 0;
+            col < 15;
+            col++
+        ) {
+
+            const cell =
+                document.createElement(
+                    "div"
+                );
+
+            cell.className =
+                "cell";
+
+            if (
+                row >= 6 &&
+                row <= 8 &&
+                col >= 6 &&
+                col <= 8
+            ) {
+
+                cell.classList.add(
+                    "center"
+                );
+
+            } else if (
+                isHomeArea(
+                    row,
+                    col
+                )
+            ) {
+
+                cell.classList.add(
+                    "home"
+                );
+
+            } else {
+
+                cell.classList.add(
+                    "path"
+                );
+            }
+
+            cell.dataset.row =
+                row;
+
+            cell.dataset.col =
+                col;
+
+            board.appendChild(
+                cell
+            );
+        }
+    }
+}
+
+
+function isHomeArea(
+    row,
+    col
+) {
+
+    const top =
+        row <= 5;
+
+    const bottom =
+        row >= 9;
+
+    const left =
+        col <= 5;
+
+    const right =
+        col >= 9;
+
+    return (
+        (top && left) ||
+        (top && right) ||
+        (bottom && left) ||
+        (bottom && right)
+    );
+}
+
+
+// ==================================================
+// BOARD RENDER
+// ==================================================
+
+function renderBoard() {
+
+    createBoard();
+
+    const cells =
+        document.querySelectorAll(
+            ".cell"
+        );
+
+    const path =
+        createPath();
+
+    for (
+        let player = 1;
+        player <= 8;
+        player++
+    ) {
+
+        const pawns =
+            gamePawns[player] ||
+            [0, 0, 0, 0];
+
+        for (
+            let pawnIndex = 0;
+            pawnIndex < 4;
+            pawnIndex++
+        ) {
+
+            const position =
+                pawns[pawnIndex];
+
+            if (
+                position <= 0
+            ) {
+                continue;
+            }
+
+            let index =
+                (position - 1) %
+                path.length;
+
+            const spot =
+                path[index];
+
+            const cell =
+                getCell(
+                    cells,
+                    spot.row,
+                    spot.col
+                );
+
+            if (!cell) continue;
+
+            const pawn =
+                document.createElement(
+                    "div"
+                );
+
+            pawn.className =
+                "pawn p" +
+                player;
+
+            pawn.innerText =
+                player +
+                "-" +
+                (pawnIndex + 1);
+
+            if (
+                player ===
+                myPlayerNumber
+            ) {
+
+                pawn.onclick =
+                    () => movePawn(
+                        pawnIndex
+                    );
+            }
+
+            cell.appendChild(
+                pawn
+            );
+        }
+    }
+}
+
+
+// ==================================================
+// PATH
+// ==================================================
+
+function createPath() {
+
+    const path = [];
+
+    for (
+        let col = 0;
+        col < 15;
+        col++
+    ) {
+
+        path.push({
+            row: 7,
+            col
+        });
+    }
+
+    for (
+        let row = 6;
+        row >= 0;
+        row--
+    ) {
+
+        path.push({
+            row,
+            col: 7
+        });
+    }
+
+    for (
+        let col = 8;
+        col < 15;
+        col++
+    ) {
+
+        path.push({
+            row: 0,
+            col
+        });
+    }
+
+    for (
+        let row = 1;
+        row < 15;
+        row++
+    ) {
+
+        path.push({
+            row,
+            col: 14
+        });
+    }
+
+    for (
+        let col = 13;
+        col >= 0;
+        col--
+    ) {
+
+        path.push({
+            row: 14,
+            col
+        });
+    }
+
+    for (
+        let row = 13;
+        row >= 8;
+        row--
+    ) {
+
+        path.push({
+            row,
+            col: 0
+        });
+    }
+
+    return path;
+}
+
+
+function getCell(
+    cells,
+    row,
+    col
+) {
+
+    for (
+        const cell of cells
+    ) {
+
+        if (
+            Number(
+                cell.dataset.row
+            ) === row &&
+            Number(
+                cell.dataset.col
+            ) === col
+        ) {
+
+            return cell;
+        }
+    }
+
+    return null;
+}
+
+
+// ==================================================
+// START
+// ==================================================
+
+createBoard();
+
+</script>
+
+</body>
+</html>
